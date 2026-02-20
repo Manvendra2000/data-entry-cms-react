@@ -1,24 +1,40 @@
-import logo from './logo.svg';
-import './App.css';
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import Login from './components/Login';
+import Dashboard from './components/Dashboard';
+
+// This acts as your security guard. 
+// It checks if a JWT token exists in the browser before letting anyone in.
+const ProtectedRoute = ({ children }) => {
+  const token = localStorage.getItem('strapiJWT');
+  
+  if (!token) {
+    // No token found? Kick them back to the login page.
+    return <Navigate to="/" replace />;
+  }
+  
+  // Token found? Let them see the protected screen.
+  return children;
+};
 
 function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <Router>
+      <Routes>
+        {/* Public Route */}
+        <Route path="/" element={<Login />} />
+
+        {/* Protected Route (Screen 1) */}
+        <Route 
+          path="/dashboard" 
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          } 
+        />
+      </Routes>
+    </Router>
   );
 }
 
