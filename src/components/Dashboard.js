@@ -42,15 +42,10 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           
           {/* Option 1: Modify Existing */}
-          {/* <button 
-            onClick={() => console.log('Navigate to Edit List')}
-            className="flex flex-col items-center justify-center p-8 bg-white rounded-xl shadow-md hover:shadow-lg border-2 border-transparent hover:border-orange-500 transition-all group"
-          > */}
-            <button 
-  onClick={() => navigate('/edit-list')}
-  className="flex flex-col items-center..."
->
-
+          <button 
+            onClick={() => navigate('/edit-list')}
+            className="flex flex-col items-center justify-center p-8 bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow duration-200 group"
+          >
             <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
               📝
             </div>
@@ -61,11 +56,10 @@ const Dashboard = () => {
           </button>
 
           {/* Option 2: Add New */}
-       
-            <button 
-  onClick={() => navigate('/add-new')} // Add this navigation path
-  className="flex flex-col items-center justify-center p-8 bg-white..."
->
+          <button 
+            onClick={() => navigate('/add-new')}
+            className="flex flex-col items-center justify-center p-8 bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow duration-200 group"
+          >
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
               ✨
             </div>
