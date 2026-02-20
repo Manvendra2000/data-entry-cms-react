@@ -42,10 +42,15 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           
           {/* Option 1: Modify Existing */}
-          <button 
+          {/* <button 
             onClick={() => console.log('Navigate to Edit List')}
             className="flex flex-col items-center justify-center p-8 bg-white rounded-xl shadow-md hover:shadow-lg border-2 border-transparent hover:border-orange-500 transition-all group"
-          >
+          > */}
+            <button 
+  onClick={() => navigate('/edit-list')}
+  className="flex flex-col items-center..."
+>
+
             <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
               📝
             </div>
@@ -56,10 +61,11 @@ const Dashboard = () => {
           </button>
 
           {/* Option 2: Add New */}
-          <button 
-            onClick={() => console.log('Navigate to Add New Form')}
-            className="flex flex-col items-center justify-center p-8 bg-white rounded-xl shadow-md hover:shadow-lg border-2 border-transparent hover:border-green-500 transition-all group"
-          >
+       
+            <button 
+  onClick={() => navigate('/add-new')} // Add this navigation path
+  className="flex flex-col items-center justify-center p-8 bg-white..."
+>
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
               ✨
             </div>
