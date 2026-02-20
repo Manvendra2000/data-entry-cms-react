@@ -139,7 +139,7 @@ const handleAutoTranslate = async (index) => {
 
   const addTika = (bhashyaIndex) => {
     const newComms = [...commentaries];
-    newComms[bhashyaIndex].tika.push({ text: '', translation: '' });
+newComms[bhashyaIndex].tika.push({ text: '', translation: '', authorTitle: '' });
     setCommentaries(newComms);
   };
   const removeTika = (bIdx, tIdx) => {
@@ -185,18 +185,21 @@ const handleAutoTranslate = async (index) => {
       if (metadata.addBhashya && commentaries.length > 0) {
         payload.data.Commentry = commentaries.map(c => {
           const bhashyaObj = {
-            Text: textToBlocks(c.Text),
+            content: textToBlocks(c.Text), // Changed to match schema
             translation: textToBlocks(c.translation),
             author: parseInt(metadata.author),
-            // translations: c.translations map goes here based on Strapi schema
           };
+          
           if (metadata.addTika && c.tika.length > 0) {
             bhashyaObj.tika = c.tika.map(t => ({
-              text: textToBlocks(t.text),
+              content: textToBlocks(t.text), // Changed to match schema
+              
               translation: textToBlocks(t.translation),
+              authorTitle: t.authorTitle,
               author: parseInt(metadata.author)
             }));
           }
+          
           return bhashyaObj;
         });
       }
@@ -402,11 +405,54 @@ const handleAutoTranslate = async (index) => {
                           <button type="button" onClick={() => addTika(idx)} className="text-xs bg-white border px-2 py-1 rounded text-orange-600 shadow-sm">+ Add Tika</button>
                         </div>
                         {c.tika.map((t, tIdx) => (
-                          <div key={tIdx} className="mb-2 relative pr-8">
-                            <textarea placeholder="Tika Text..." value={t.text} onChange={e => {
-                              const newComms = [...commentaries]; newComms[idx].tika[tIdx].text = e.target.value; setCommentaries(newComms);
-                            }} className="w-full p-2 border rounded font-mono text-xs" rows="1" />
-                            <button type="button" onClick={() => removeTika(idx, tIdx)} className="absolute right-0 top-1 text-red-500 text-lg hover:bg-red-50 px-2 rounded">✕</button>
+                          <div key={tIdx} className="mb-3 relative pr-8 bg-white p-3 border rounded shadow-sm">
+                            
+                            {/* NEW: Tika Title Input */}
+                            <input 
+                              type="text" 
+                              placeholder="Tika Title (e.g., Anandagiri Tika)" 
+                              value={t.authorTitle || ''} 
+                              onChange={e => {
+                                const newComms = [...commentaries]; 
+                                newComms[idx].tika[tIdx].authorTitle = e.target.value; 
+                                setCommentaries(newComms);
+                              }} 
+                              className="w-full p-2 border border-gray-200 rounded text-sm mb-2 font-semibold text-gray-700" 
+                            />
+
+                            {/* Existing Tika Text Input */}
+                            <textarea 
+                              placeholder="Tika Text (Original)..." 
+                              value={t.text} 
+                              onChange={e => {
+                                const newComms = [...commentaries]; 
+                                newComms[idx].tika[tIdx].text = e.target.value; 
+                                setCommentaries(newComms);
+                              }} 
+                              className="w-full p-2 border border-gray-200 rounded font-mono text-xs mb-2 bg-gray-50" 
+                              rows="2" 
+                            />
+
+                            {/* Existing Tika Translation Input (Optional if you want to show it) */}
+                            <textarea 
+                              placeholder="Tika Translation..." 
+                              value={t.translation} 
+                              onChange={e => {
+                                const newComms = [...commentaries]; 
+                                newComms[idx].tika[tIdx].translation = e.target.value; 
+                                setCommentaries(newComms);
+                              }} 
+                              className="w-full p-2 border border-gray-200 rounded font-mono text-xs bg-gray-50" 
+                              rows="2" 
+                            />
+
+                            <button 
+                              type="button" 
+                              onClick={() => removeTika(idx, tIdx)} 
+                              className="absolute right-2 top-2 text-red-400 text-lg hover:bg-red-50 hover:text-red-600 px-2 rounded transition-colors"
+                            >
+                              ✕
+                            </button>
                           </div>
                         ))}
                       </div>
