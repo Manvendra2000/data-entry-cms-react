@@ -42,6 +42,16 @@ const AddShloka = () => {
   });
 
   // --- STEP 2 STATE: Shloka Entry ---
+  // const [entryData, setEntryData] = useState({
+  //   hierarchyValues: ['', ''], 
+  //   sourceText: '',
+  //   englishTranslation: '',
+  //   bhashyaSanskrit: '',
+  //   bhashyaEnglish: '',
+  //   teekaEntries: [] 
+  // });
+
+  // --- STEP 2 STATE: Shloka Entry ---
   const [entryData, setEntryData] = useState({
     hierarchyValues: ['', ''], 
     sourceText: '',
@@ -50,6 +60,37 @@ const AddShloka = () => {
     bhashyaEnglish: '',
     teekaEntries: [] 
   });
+
+  // ADD THESE LINES HERE (Approx Line 57):
+  // const [selectableAuthors, setSelectableAuthors] = useState([]);
+
+  // useEffect(() => {
+  //   if (bookConfig.selectedBookId) {
+  //     // Strapi v4 nests fields under .attributes; v5 may flatten them
+  //     const selectedBook = availableBooks.find(b => b.id.toString() === bookConfig.selectedBookId.toString());
+  //     const allowed = selectedBook?.attributes?.commentators || selectedBook?.commentators || [];
+  //     setSelectableAuthors(allowed);
+  //   } else {
+  //     setSelectableAuthors([]);
+  //   }
+  // }, [bookConfig.selectedBookId, availableBooks]);
+  // --- Replace everything from const [selectableAuthors... down to the next useEffect ---
+  const [selectableAuthors, setSelectableAuthors] = useState([]);
+
+  useEffect(() => {
+    if (bookConfig.selectedBookId && availableBooks.length > 0) {
+      // 1. Find the selected book object in the list fetched from Strapi
+      const selectedBook = availableBooks.find(b => b.id.toString() === bookConfig.selectedBookId.toString());
+      
+      // 2. Extract the commentators list directly from the database JSON field
+      // This supports both nested (attributes) and flattened response structures
+      const authors = selectedBook?.attributes?.commentators || selectedBook?.commentators || [];
+      
+      setSelectableAuthors(authors);
+    } else {
+      setSelectableAuthors([]);
+    }
+  }, [bookConfig.selectedBookId, availableBooks]);
 
   // Fetch Books from Strapi
   useEffect(() => {
@@ -212,7 +253,7 @@ const AddShloka = () => {
               </div>
 
               {/* Teeka List with inline + button */}
-              <div className="space-y-3">
+              {/* <div className="space-y-3">
                 <label className="block text-xs font-bold text-slate-500 uppercase">Teeka / Commentaries</label>
                 {bookConfig.selectedTeekas.map((teeka, idx) => (
                   <div key={idx} className="flex gap-2 items-center">
@@ -228,7 +269,47 @@ const AddShloka = () => {
                     <button onClick={() => setIsAddingAuthor(idx)} className="p-2 text-indigo-600 bg-indigo-50 rounded-lg">+</button>
                     <button onClick={() => setBookConfig({...bookConfig, selectedTeekas: bookConfig.selectedTeekas.filter((_, i) => i !== idx)})} className="text-slate-300 hover:text-red-500">✕</button>
                   </div>
-                ))}
+                ))} */}
+                {/* Teeka List with inline + button (Approx Line 144) */}
+  <div className="space-y-3">
+    <label className="block text-xs font-bold text-slate-500 uppercase">Teeka / Commentaries</label>
+    {bookConfig.selectedTeekas.map((teeka, idx) => (
+      <div key={idx} className="flex gap-2 items-center">
+        {/* REPLACE YOUR OLD SELECT WITH THIS DYNAMIC ONE: */}
+        {/* <select 
+          className="flex-1 p-3 border rounded-xl bg-slate-50" 
+          value={teeka} 
+          onChange={e => {
+            const newT = [...bookConfig.selectedTeekas];
+            newT[idx] = e.target.value;
+            setBookConfig({...bookConfig, selectedTeekas: newT});
+          }}
+        >
+          <option value="">Select Author...</option>
+          {selectableAuthors.map((author, i) => (
+            <option key={i} value={author}>{author}</option>
+          ))}
+        </select> */}
+        <select 
+  className="flex-1 p-3 border rounded-xl bg-slate-50" 
+  value={teeka} 
+  onChange={e => {
+    const newT = [...bookConfig.selectedTeekas];
+    newT[idx] = e.target.value;
+    setBookConfig({...bookConfig, selectedTeekas: newT});
+  }}
+>
+  <option value="">Select Author...</option>
+  {/* This now dynamically shows only the authors allowed for the selected book */}
+  {selectableAuthors.map((author, i) => (
+    <option key={i} value={author}>{author}</option>
+  ))}
+</select>
+        
+        <button onClick={() => setIsAddingAuthor(idx)} className="p-2 text-indigo-600 bg-indigo-50 rounded-lg">+</button>
+        <button onClick={() => setBookConfig({...bookConfig, selectedTeekas: bookConfig.selectedTeekas.filter((_, i) => i !== idx)})} className="text-slate-300 hover:text-red-500">✕</button>
+      </div>
+    ))}
                 
                 {isAddingAuthor !== null && (
                    <div className="flex gap-2 p-3 bg-indigo-50 rounded-xl border border-indigo-100">
