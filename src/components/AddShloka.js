@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
-const API_BASE_URL = "https://dev.ekatmdhamlibrary.xoidlabs.com";
+//const API_BASE_URL = "https://dev.ekatmdhamlibrary.xoidlabs.com";
+// Change this line at the top of AddShloka.js
+const API_BASE_URL = "http://localhost:1337";
 
-// --- UTILS: Script Filtering & Regex ---
+// --- UTILS: Script Filtering ---
 const filterDevanagari = (val) => val.replace(/[^\u0900-\u097F\s.,;:!?'"|॥०-९\-\n\r()[\]{}@#$%^&*_+=\/\\<>~'|]/g, '');
 const filterEnglish = (val) => val.replace(/[^a-zA-Z0-9\s.,;:!?'"()[\]{}\-\n\r@#$%^&*_+=\/\\<>~'|]/g, '');
 
@@ -12,46 +14,90 @@ const AddShloka = () => {
   const navigate = useNavigate();
   const token = localStorage.getItem('strapiJWT');
 
-  // --- UI & Step State ---
+  // Move these back INSIDE the AddShloka function
+  const [isAddingBook, setIsAddingBook] = useState(false);
+  const [newBookTitle, setNewBookTitle] = useState('');
+  const [isAddingAuthor, setIsAddingAuthor] = useState(null);
+  const [newAuthorName, setNewAuthorName] = useState('');
+  
+  // ... the rest of your states (step, isLoading, bookConfig, etc.)
+
+  // UI & Step State
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [availableBooks, setAvailableBooks] = useState([]);
 
-  // --- STEP 1 STATE: Config & Metadata ---
+
+  // --- STEP 1 STATE: Metadata Config ---
   const [bookConfig, setBookConfig] = useState({
     selectedBookId: '',
+    selectedBhashya: 'Shankaracharya',
     introduction: '',
     shankaracharyaIntro: '',
     shankaracharyaIntroTranslation: '',
-    hierarchyLevels: 2,
-    hierarchyNames: ['Chapter', 'Verse'],
-    selectedCommentators: [] // Array of strings
+    hierarchyLevels: 2, 
+    hierarchyNames: ['अध्याय', 'श्लोक'],
+    selectedTeekas: [''] 
   });
 
-  // --- STEP 2 STATE: Content Entry ---
+  // --- STEP 2 STATE: Shloka Entry ---
   const [entryData, setEntryData] = useState({
-    sourceText: '',
     hierarchyValues: ['', ''], 
-    verseTranslations: [{ lang: 'English', text: '' }],
-    bhashyaContent: { sanskrit: '', english: '' },
-    teekas: [] // Generated based on selectedCommentators
+    sourceText: '',
+    englishTranslation: '',
+    bhashyaSanskrit: '',
+    bhashyaEnglish: '',
+    teekaEntries: [] 
   });
 
-  // Fetch Books for Dropdown
-  const [availableBooks, setAvailableBooks] = useState([]);
+  // Fetch Books from Strapi
   useEffect(() => {
     const fetchBooks = async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/books`);
-        setAvailableBooks(res.data.data);
-      } catch (err) { console.error("Books fetch failed", err); }
+        const res = await axios.get(`${API_BASE_URL}/api/books`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setAvailableBooks(res.data.data || []); 
+      } catch (err) { 
+        console.error("Books fetch failed", err);
+      }
     };
-    fetchBooks();
-  }, []);
+    if (token) fetchBooks();
+  }, [token]);
 
-  // --- HANDLERS: Hierarchy Control ---
-  const adjustHierarchy = (delta) => {
-    const newCount = Math.min(Math.max(bookConfig.hierarchyLevels + delta, 1), 4);
+  // --- "ON THE GO" HANDLERS ---
+  const handleQuickAddBook = async () => {
+    if (!newBookTitle.trim()) return;
+    try {
+      const res = await axios.post(`${API_BASE_URL}/api/books`, 
+        { data: { title: newBookTitle } },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setAvailableBooks([...availableBooks, res.data.data]);
+      setBookConfig({ ...bookConfig, selectedBookId: res.data.data.id });
+      setIsAddingBook(false);
+      setNewBookTitle('');
+    } catch (err) { console.error("Quick add book failed", err); }
+  };
+
+  const handleQuickAddAuthor = async (index) => {
+    if (!newAuthorName.trim()) return;
+    try {
+      // Logic for adding to an authors collection if it exists
+      const updatedTeekas = [...bookConfig.selectedTeekas];
+      updatedTeekas[index] = newAuthorName;
+      setBookConfig({ ...bookConfig, selectedTeekas: updatedTeekas });
+      setIsAddingAuthor(null);
+      setNewAuthorName('');
+    } catch (err) { console.error("Quick add author failed", err); }
+  };
+
+  // --- LOGIC HANDLERS ---
+  const handleHierarchyChange = (delta) => {
+    const newCount = bookConfig.hierarchyLevels + delta;
+    if (newCount < 2 || newCount > 4) return; 
+
     const newNames = [...bookConfig.hierarchyNames];
     const newValues = [...entryData.hierarchyValues];
     
@@ -66,36 +112,24 @@ const AddShloka = () => {
     setEntryData(prev => ({ ...prev, hierarchyValues: newValues }));
   };
 
-  // --- HANDLERS: Auto-Increment Logic ---
-  const incrementHierarchy = (values) => {
-    const newValues = [...values];
-    const lastIdx = newValues.length - 1;
-    const lastVal = newValues[lastIdx];
+  const handleNext = () => {
+    const slots = bookConfig.selectedTeekas
+      .filter(t => t !== '')
+      .map(author => ({ author, teekaName: '', sanskrit: '', english: '' }));
     
-    if (!isNaN(lastVal) && lastVal !== '') {
-      newValues[lastIdx] = (parseInt(lastVal) + 1).toString();
-    } else if (lastVal.includes('.')) {
-      const parts = lastVal.split('.');
-      const lastPart = parts.pop();
-      if (!isNaN(lastPart)) {
-        newValues[lastIdx] = [...parts, parseInt(lastPart) + 1].join('.');
-      }
-    }
-    return newValues;
+    setEntryData(prev => ({ ...prev, teekaEntries: slots }));
+    setStep(2);
   };
 
-  // --- SUBMIT: POST to Strapi ---
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (isFinish = false) => {
     setIsLoading(true);
-    
     const payload = {
       data: {
         sourceText: entryData.sourceText,
-        hierarchyValues: entryData.hierarchyValues, // Matches JSON field
-        verseTranslations: entryData.verseTranslations,
-        bhashyaContent: entryData.bhashyaContent,
-        teekas: entryData.teekas,
+        hierarchyValues: entryData.hierarchyValues,
+        verseTranslations: [{ lang: 'English', text: entryData.englishTranslation }],
+        bhashyaContent: { sanskrit: entryData.bhashyaSanskrit, english: entryData.bhashyaEnglish },
+        teekas: entryData.teekaEntries,
         book: bookConfig.selectedBookId
       }
     };
@@ -104,180 +138,203 @@ const AddShloka = () => {
       await axios.post(`${API_BASE_URL}/api/entries`, payload, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
-      setMessage({ type: 'success', text: 'Entry saved! Hierarchy incremented.' });
-      
-      // Auto-Increment and Reset specific fields
-      setEntryData(prev => ({
-        ...prev,
-        sourceText: '',
-        hierarchyValues: incrementHierarchy(prev.hierarchyValues),
-        bhashyaContent: { sanskrit: '', english: '' },
-        teekas: prev.teekas.map(t => ({ ...t, text: '', translation: '' }))
-      }));
-
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch (err) {
-      setMessage({ type: 'error', text: 'Save failed. Check console.' });
-    } finally {
-      setIsLoading(false);
-    }
+      if (isFinish) navigate('/dashboard');
+      else {
+        const nextVals = [...entryData.hierarchyValues];
+        const lastIdx = nextVals.length - 1;
+        if (!isNaN(nextVals[lastIdx])) nextVals[lastIdx] = (parseInt(nextVals[lastIdx]) + 1).toString();
+        
+        setEntryData(prev => ({ ...prev, sourceText: '', englishTranslation: '', bhashyaSanskrit: '', bhashyaEnglish: '', hierarchyValues: nextVals }));
+        setMessage({ type: 'success', text: 'Saved! Values incremented.' });
+        setTimeout(() => setMessage({type: '', text: ''}), 3000);
+      }
+    } catch (err) { setMessage({ type: 'error', text: 'Error saving entry.' }); }
+    finally { setIsLoading(false); }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6 font-sans">
-      <div className="max-w-5xl mx-auto bg-white shadow-xl rounded-2xl overflow-hidden">
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center py-10 px-4">
+      <div className="w-full max-w-4xl bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-200">
         
-        {/* Header */}
-        <div className="bg-indigo-900 p-6 text-white flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold">Ekatm Dham Content Engine</h1>
-            <p className="text-indigo-200 text-sm">Step {step}: {step === 1 ? 'Metadata & Config' : 'Content Ingestion'}</p>
-          </div>
-          <button onClick={() => navigate('/dashboard')} className="bg-indigo-800 px-4 py-2 rounded-lg text-sm hover:bg-indigo-700">Dashboard</button>
+        {/* Progress Stepper */}
+        <div className="bg-slate-50 border-b border-slate-100 p-6 flex justify-center items-center gap-16">
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all ${step === 1 ? 'bg-indigo-600 text-white shadow-lg scale-110' : 'bg-green-500 text-white'}`}>1</div>
+          <div className="h-[2px] w-24 bg-slate-200"></div>
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all ${step === 2 ? 'bg-indigo-600 text-white shadow-lg scale-110' : 'bg-slate-200 text-slate-400'}`}>2</div>
         </div>
 
         <div className="p-8">
           {step === 1 ? (
-            <section className="space-y-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">Target Book</label>
-                  <select 
-                    className="w-full p-3 border-2 border-gray-100 rounded-xl focus:border-indigo-500 outline-none"
-                    value={bookConfig.selectedBookId}
-                    onChange={(e) => setBookConfig({...bookConfig, selectedBookId: e.target.value})}
-                  >
-                    <option value="">Select a Book from Library...</option>
-                    {availableBooks.map(b => <option key={b.id} value={b.id}>{b.attributes.title}</option>)}
+            <div className="space-y-8">
+              <div className="grid grid-cols-2 gap-6">
+                {/* Book Selector with + Button */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-500 uppercase">Book</label>
+                  {!isAddingBook ? (
+                    <div className="flex gap-2">
+                      <select 
+                            className="flex-1 p-4 border rounded-xl bg-slate-50" 
+                            value={bookConfig.selectedBookId} 
+                            onChange={e => setBookConfig({...bookConfig, selectedBookId: e.target.value})}
+                          >
+                            <option value="">Select Book...</option>
+                            {/* The fix: Use optional chaining to prevent reading 'title' of undefined */}
+                            {availableBooks?.map(b => (
+                              <option key={b.id} value={b.id}>
+                                {b.attributes?.title || b.title || "Untitled Book"}
+                              </option>
+                            ))}
+                          </select>
+                      <button onClick={() => setIsAddingBook(true)} className="p-3 bg-indigo-50 text-indigo-600 rounded-xl font-bold hover:bg-indigo-100">+</button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <input autoFocus className="flex-1 p-3 border rounded-xl" placeholder="New Book Title..." value={newBookTitle} onChange={e => setNewBookTitle(e.target.value)} />
+                      <button onClick={handleQuickAddBook} className="bg-green-600 text-white px-4 rounded-xl font-bold">Save</button>
+                      <button onClick={() => setIsAddingBook(false)} className="bg-slate-100 text-slate-500 px-3 rounded-xl">✕</button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-500 uppercase">Bhashya</label>
+                  <select className="w-full p-3 border rounded-xl bg-slate-50" value={bookConfig.selectedBhashya} onChange={e => setBookConfig({...bookConfig, selectedBhashya: e.target.value})}>
+                    <option>Shankaracharya</option>
+                    <option>Ramanujacharya</option>
                   </select>
                 </div>
+              </div>
 
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">Hierarchy Depth ({bookConfig.hierarchyLevels})</label>
-                  <div className="flex items-center gap-4">
-                    <button onClick={() => adjustHierarchy(-1)} className="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200">-</button>
-                    <div className="flex-1 flex gap-2">
-                      {bookConfig.hierarchyNames.map((name, i) => (
-                        <input 
-                          key={i}
-                          value={name}
-                          onChange={(e) => {
-                            const n = [...bookConfig.hierarchyNames];
-                            n[i] = e.target.value;
-                            setBookConfig({...bookConfig, hierarchyNames: n});
-                          }}
-                          className="w-full text-center text-xs p-2 bg-indigo-50 border-none rounded-md"
-                        />
-                      ))}
-                    </div>
-                    <button onClick={() => adjustHierarchy(1)} className="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200">+</button>
+              <div className="space-y-4">
+                <textarea placeholder="Book Introduction (Optional)" className="w-full p-4 border rounded-xl min-h-[80px]" value={bookConfig.introduction} onChange={e => setBookConfig({...bookConfig, introduction: e.target.value})} />
+                <textarea placeholder="Introduction by Shankaracharya" className="w-full p-4 border rounded-xl font-serif text-lg bg-amber-50/30" value={bookConfig.shankaracharyaIntro} onChange={e => setBookConfig({...bookConfig, shankaracharyaIntro: filterDevanagari(e.target.value)})} />
+                <textarea placeholder="Translation of Introduction" className="w-full p-4 border rounded-xl" value={bookConfig.shankaracharyaIntroTranslation} onChange={e => setBookConfig({...bookConfig, shankaracharyaIntroTranslation: filterEnglish(e.target.value)})} />
+              </div>
+
+              {/* Teeka List with inline + button */}
+              <div className="space-y-3">
+                <label className="block text-xs font-bold text-slate-500 uppercase">Teeka / Commentaries</label>
+                {bookConfig.selectedTeekas.map((teeka, idx) => (
+                  <div key={idx} className="flex gap-2 items-center">
+                    <select className="flex-1 p-3 border rounded-xl bg-slate-50" value={teeka} onChange={e => {
+                      const newT = [...bookConfig.selectedTeekas];
+                      newT[idx] = e.target.value;
+                      setBookConfig({...bookConfig, selectedTeekas: newT});
+                    }}>
+                      <option value="">Select Author...</option>
+                      <option>Anandagiri</option>
+                      <option>Adi Shankaracharya</option>
+                    </select>
+                    <button onClick={() => setIsAddingAuthor(idx)} className="p-2 text-indigo-600 bg-indigo-50 rounded-lg">+</button>
+                    <button onClick={() => setBookConfig({...bookConfig, selectedTeekas: bookConfig.selectedTeekas.filter((_, i) => i !== idx)})} className="text-slate-300 hover:text-red-500">✕</button>
+                  </div>
+                ))}
+                
+                {isAddingAuthor !== null && (
+                   <div className="flex gap-2 p-3 bg-indigo-50 rounded-xl border border-indigo-100">
+                     <input autoFocus placeholder="New Author Name..." className="flex-1 p-2 border rounded-lg" value={newAuthorName} onChange={e => setNewAuthorName(e.target.value)} />
+                     <button onClick={() => handleQuickAddAuthor(isAddingAuthor)} className="bg-indigo-600 text-white px-4 py-1 rounded-lg text-sm">Add</button>
+                     <button onClick={() => setIsAddingAuthor(null)} className="text-slate-500 text-sm px-2">Cancel</button>
+                   </div>
+                )}
+                <button onClick={() => setBookConfig({...bookConfig, selectedTeekas: [...bookConfig.selectedTeekas, '']})} className="text-indigo-600 font-bold text-sm hover:underline">+ Add Teeka</button>
+              </div>
+
+              {/* Hierarchy Identifiers */}
+              <div className="pt-6 border-t border-slate-100">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-slate-700 flex items-center gap-2">Hierarchy Identifiers</h3>
+                  <div className="flex items-center gap-3 bg-slate-100 p-1 rounded-xl">
+                    <button onClick={() => handleHierarchyChange(-1)} disabled={bookConfig.hierarchyLevels <= 2} className="w-8 h-8 bg-white rounded-lg shadow-sm font-bold disabled:opacity-30">-</button>
+                    <span className="font-bold px-2 text-indigo-600">{bookConfig.hierarchyLevels} Levels</span>
+                    <button onClick={() => handleHierarchyChange(1)} disabled={bookConfig.hierarchyLevels >= 4} className="w-8 h-8 bg-white rounded-lg shadow-sm font-bold disabled:opacity-30">+</button>
                   </div>
                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">Shankaracharya Intro (Sanskrit)</label>
-                  <textarea 
-                    className="w-full p-3 border rounded-xl font-serif"
-                    value={bookConfig.shankaracharyaIntro}
-                    onChange={(e) => setBookConfig({...bookConfig, shankaracharyaIntro: filterDevanagari(e.target.value)})}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">Intro Translation (English)</label>
-                  <textarea 
-                    className="w-full p-3 border rounded-xl"
-                    value={bookConfig.shankaracharyaIntroTranslation}
-                    onChange={(e) => setBookConfig({...bookConfig, shankaracharyaIntroTranslation: filterEnglish(e.target.value)})}
-                  />
+                <div className="grid grid-cols-1 gap-2">
+                  {bookConfig.hierarchyNames.map((name, i) => (
+                    <input key={i} className="p-3 border rounded-xl font-serif focus:ring-2 focus:ring-indigo-100 outline-none" value={name} onChange={e => {
+                      const n = [...bookConfig.hierarchyNames];
+                      n[i] = e.target.value;
+                      setBookConfig({...bookConfig, hierarchyNames: n});
+                    }} />
+                  ))}
                 </div>
               </div>
 
-              <button 
-                disabled={!bookConfig.selectedBookId}
-                onClick={() => {
-                  // Pre-generate teeka slots for Step 2
-                  setStep(2);
-                }} 
-                className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-indigo-700 disabled:opacity-50"
-              >
-                Continue to Shloka Entry →
-              </button>
-            </section>
+              <div className="flex justify-between items-center pt-8 border-t">
+                <button onClick={() => navigate('/dashboard')} className="px-8 py-3 text-slate-500 font-bold hover:bg-slate-100 rounded-xl">Back</button>
+                <button onClick={handleNext} disabled={!bookConfig.selectedBookId} className="px-12 py-3 bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-200 disabled:opacity-50">Next</button>
+              </div>
+            </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-8">
-              {/* Hierarchy Value Inputs */}
-              <div className="bg-indigo-50 p-6 rounded-2xl flex gap-4 overflow-x-auto">
+            <div className="space-y-8">
+              {/* Context Header */}
+              <div className="grid grid-cols-4 gap-4 bg-indigo-50 p-6 rounded-2xl border border-indigo-100 shadow-inner">
                 {bookConfig.hierarchyNames.map((name, i) => (
-                  <div key={i} className="min-w-[120px]">
-                    <label className="block text-[10px] uppercase tracking-wider font-bold text-indigo-400 mb-1">{name}</label>
-                    <input 
-                      required
-                      value={entryData.hierarchyValues[i]}
-                      onChange={(e) => {
-                        const v = [...entryData.hierarchyValues];
-                        v[i] = e.target.value;
-                        setEntryData({...entryData, hierarchyValues: v});
-                      }}
-                      className="w-full p-3 rounded-lg border-none font-bold text-indigo-900"
-                      placeholder="e.g. 1.1"
-                    />
+                  <div key={i}>
+                    <label className="block text-[10px] uppercase font-black text-indigo-400 mb-1">{name}</label>
+                    <input className="w-full p-2 rounded-lg border-none font-bold text-indigo-900 bg-white" value={entryData.hierarchyValues[i]} onChange={e => {
+                      const v = [...entryData.hierarchyValues];
+                      v[i] = e.target.value;
+                      setEntryData({...entryData, hierarchyValues: v});
+                    }} />
                   </div>
                 ))}
               </div>
 
-              {/* Source Text */}
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Original Sanskrit Text (Source)</label>
-                <textarea 
-                  required
-                  rows="4"
-                  value={entryData.sourceText}
-                  onChange={(e) => setEntryData({...entryData, sourceText: filterDevanagari(e.target.value)})}
-                  className="w-full p-4 border-2 border-gray-100 rounded-2xl font-serif text-xl focus:border-indigo-500 outline-none"
-                  placeholder="अथातो ब्रह्मजिज्ञासा ॥"
-                />
+              <div className="space-y-2">
+                <label className="block text-sm font-bold text-slate-700">Source Text (Devanagari)</label>
+                <textarea className="w-full p-5 border rounded-2xl min-h-[140px] font-serif text-2xl bg-slate-50/50 shadow-sm" value={entryData.sourceText} onChange={e => setEntryData({...entryData, sourceText: filterDevanagari(e.target.value)})} />
               </div>
 
-              {/* Bhashya Content */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-t pt-8">
-                <div className="bg-amber-50 p-6 rounded-2xl border border-amber-100">
-                  <h3 className="font-bold text-amber-900 mb-4">Bhashyam (Sanskrit)</h3>
-                  <textarea 
-                    value={entryData.bhashyaContent.sanskrit}
-                    onChange={(e) => setEntryData({...entryData, bhashyaContent: {...entryData.bhashyaContent, sanskrit: filterDevanagari(e.target.value)}})}
-                    className="w-full p-3 rounded-xl border-none font-serif min-h-[150px]"
-                  />
+              <div className="space-y-6 pt-6 border-t">
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-400 uppercase">Translations & Bhashya</label>
+                  <textarea placeholder="English Translation" className="w-full p-4 border rounded-xl" value={entryData.englishTranslation} onChange={e => setEntryData({...entryData, englishTranslation: filterEnglish(e.target.value)})} />
                 </div>
-                <div className="bg-blue-50 p-6 rounded-2xl border border-blue-100">
-                  <h3 className="font-bold text-blue-900 mb-4">Bhashyam (English)</h3>
-                  <textarea 
-                    value={entryData.bhashyaContent.english}
-                    onChange={(e) => setEntryData({...entryData, bhashyaContent: {...entryData.bhashyaContent, english: filterEnglish(e.target.value)}})}
-                    className="w-full p-3 rounded-xl border-none min-h-[150px]"
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <textarea placeholder="Bhashyam (Sanskrit)" className="p-4 border rounded-xl min-h-[120px] font-serif bg-amber-50/20" value={entryData.bhashyaSanskrit} onChange={e => setEntryData({...entryData, bhashyaSanskrit: filterDevanagari(e.target.value)})} />
+                  <textarea placeholder="Bhashyam (English)" className="p-4 border rounded-xl min-h-[120px]" value={entryData.bhashyaEnglish} onChange={e => setEntryData({...entryData, bhashyaEnglish: filterEnglish(e.target.value)})} />
                 </div>
               </div>
+
+              {/* Dynamic Teeka Sections */}
+              {entryData.teekaEntries.map((teeka, idx) => (
+                <div key={idx} className="p-6 border rounded-2xl bg-slate-50/50 border-slate-200 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-indigo-600"></div>
+                    <span className="font-black text-indigo-900 text-sm tracking-widest uppercase">{teeka.author}</span>
+                  </div>
+                  <input placeholder="Teeka Name" className="w-full p-3 border rounded-xl bg-white" value={teeka.teekaName} onChange={e => {
+                    const newT = [...entryData.teekaEntries];
+                    newT[idx].teekaName = e.target.value;
+                    setEntryData({...entryData, teekaEntries: newT});
+                  }} />
+                  <textarea placeholder="Original Text (Sanskrit)" className="w-full p-3 border rounded-xl font-serif min-h-[100px]" value={teeka.sanskrit} onChange={e => {
+                    const newT = [...entryData.teekaEntries];
+                    newT[idx].sanskrit = filterDevanagari(e.target.value);
+                    setEntryData({...entryData, teekaEntries: newT});
+                  }} />
+                  <textarea placeholder="English Translation" className="w-full p-3 border rounded-xl min-h-[100px]" value={teeka.english} onChange={e => {
+                    const newT = [...entryData.teekaEntries];
+                    newT[idx].english = filterEnglish(e.target.value);
+                    setEntryData({...entryData, teekaEntries: newT});
+                  }} />
+                </div>
+              ))}
 
               {message.text && (
-                <div className={`p-4 rounded-xl font-bold text-center ${message.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                <div className={`p-4 rounded-xl text-center font-bold ${message.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                   {message.text}
                 </div>
               )}
 
-              <div className="flex gap-4">
-                <button type="button" onClick={() => setStep(1)} className="px-8 py-4 bg-gray-100 rounded-xl font-bold text-gray-600 hover:bg-gray-200">Back</button>
-                <button 
-                  type="submit" 
-                  disabled={isLoading}
-                  className="flex-1 bg-green-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-green-700 disabled:opacity-50"
-                >
-                  {isLoading ? 'Processing...' : 'Save Shloka Entry & Increment'}
-                </button>
+              <div className="flex gap-4 pt-10 border-t">
+                <button onClick={() => setStep(1)} className="px-10 py-4 font-bold text-slate-400 hover:text-slate-600">Back</button>
+                <button onClick={() => handleSubmit(false)} className="flex-1 py-4 bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700">Save & Next Entry</button>
+                <button onClick={() => handleSubmit(true)} className="px-10 py-4 bg-green-600 text-white rounded-xl font-bold shadow-lg shadow-green-100 hover:bg-green-700">Finish</button>
               </div>
-            </form>
+            </div>
           )}
         </div>
       </div>
