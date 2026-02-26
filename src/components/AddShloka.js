@@ -206,6 +206,95 @@ const handleHierarchyChange = (delta) => {
     finally { setIsLoading(false); }
   };
 
+
+  // Add a new state to track the ID of the entry we are building
+const [activeEntryId, setActiveEntryId] = useState(null);
+const [allShlokas, setAllShlokas] = useState([]); // Local array to hold shlokas before "Finish"
+
+const handleSaveShloka = async () => {
+  setIsLoading(true);
+  
+  // 1. Create the new shloka object
+  const newShloka = {
+    hierarchyValues: entryData.hierarchyValues,
+    sourceText: entryData.sourceText,
+    translations: [{ lang: 'English', text: entryData.englishTranslation }],
+    bhashya: { sanskrit: entryData.bhashyaSanskrit, english: entryData.bhashyaEnglish },
+    teekas: entryData.teekaEntries
+  };
+
+  const updatedShlokas = [...allShlokas, newShloka];
+  setAllShlokas(updatedShlokas);
+
+  // 2. Prepare Payload for Strapi
+  const payload = {
+    data: {
+      // We store the array of shlokas in the 'teekas' or a new JSON field
+      // For your current schema, let's use a structured JSON in 'sourceText' or 'teekas'
+      teekas: updatedShlokas, 
+      book: bookConfig.selectedBookId,
+      hierarchyValues: entryData.hierarchyValues // Stores the latest index
+    }
+  };
+
+  try {
+    let res;
+    if (!activeEntryId) {
+      // First save: Create the Entry
+      res = await axios.post(`${API_BASE_URL}/api/entries`, payload, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setActiveEntryId(res.data.data.id);
+    } else {
+      // Subsequent saves: Update the SAME Entry
+      res = await axios.put(`${API_BASE_URL}/api/entries/${activeEntryId}`, payload, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+    }
+
+    // 3. Handle Auto-Increment for the NEXT shloka
+    handleAutoIncrement();
+    setMessage({ type: 'success', text: 'Shloka added to Entry!' });
+  } catch (err) {
+    console.error("Save failed", err);
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+const handleAutoIncrement = () => {
+  const nextVals = [...entryData.hierarchyValues];
+  const lastIdx = nextVals.length - 1;
+  // Standard increment for the last level (e.g., Shloka 1 -> 2)
+  if (!isNaN(nextVals[lastIdx])) {
+    nextVals[lastIdx] = (parseInt(nextVals[lastIdx]) + 1).toString();
+  }
+  
+  // Reset entry fields for the next shloka but keep context
+  setEntryData(prev => ({ 
+    ...prev, 
+    sourceText: '', 
+    englishTranslation: '', 
+    bhashyaSanskrit: '', 
+    bhashyaEnglish: '', 
+    hierarchyValues: nextVals,
+    // Keep teeka entries but clear their specific content
+    teekaEntries: prev.teekaEntries.map(t => ({ ...t, teekaName: '', sanskrit: '', english: '' }))
+  }));
+};
+const manualIncrement = (levelIndex) => {
+  const newValues = [...entryData.hierarchyValues];
+  const currentVal = parseInt(newValues[levelIndex]) || 0;
+  newValues[levelIndex] = (currentVal + 1).toString();
+  
+  // Reset all levels AFTER the incremented one to '1'
+  // Example: incrementing level 2 (Sarga) should reset level 3 (Shloka) to 1.
+  for (let i = levelIndex + 1; i < newValues.length; i++) {
+    newValues[i] = '1';
+  }
+  
+  setEntryData({ ...entryData, hierarchyValues: newValues });
+};
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center py-10 px-4">
       <div className="w-full max-w-4xl bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-200">
@@ -425,6 +514,29 @@ const handleHierarchyChange = (delta) => {
 
               <div className="flex gap-4 pt-10 border-t">
                 <button onClick={() => setStep(1)} className="px-10 py-4 font-bold text-slate-400 hover:text-slate-600">Back</button>
+                <div className="grid grid-cols-4 gap-4 bg-indigo-50 p-6 rounded-2xl border border-indigo-100">
+  {bookConfig.hierarchyNames.map((name, i) => (
+    <div key={i} className="relative group">
+      <label className="block text-[10px] uppercase font-black text-indigo-400 mb-1">{name}</label>
+      <div className="flex items-center gap-1">
+        <input 
+          className="w-full p-2 rounded-lg border-none font-bold text-indigo-900 bg-white" 
+          value={entryData.hierarchyValues[i] || '1'} 
+          onChange={e => {
+            const v = [...entryData.hierarchyValues];
+            v[i] = e.target.value;
+            setEntryData({...entryData, hierarchyValues: v});
+          }}
+        />
+        {/* Manual Increment Button for each level */}
+        <button 
+          onClick={() => manualIncrement(i)}
+          className="p-1 bg-indigo-200 text-indigo-700 rounded hover:bg-indigo-300 text-xs font-bold"
+        > + </button>
+      </div>
+    </div>
+  ))}
+</div>
                 <button onClick={() => handleSubmit(false)} className="flex-1 py-4 bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700">Save & Next Entry</button>
                 <button onClick={() => handleSubmit(true)} className="px-10 py-4 bg-green-600 text-white rounded-xl font-bold shadow-lg shadow-green-100 hover:bg-green-700">Finish</button>
               </div>

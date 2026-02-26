@@ -4,6 +4,7 @@ import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import EditList from './components/EditList';
 import AddShloka from './components/AddShloka';
+import EditShloka from './components/EditShloka';
 
 // This acts as your security guard. 
 // It checks if a JWT token exists in the browser before letting anyone in.
@@ -35,24 +36,37 @@ function App() {
             </ProtectedRoute>
           } 
         />
-         <Route 
-        path="/edit-list" 
-        element={
-          <ProtectedRoute>
-            <EditList />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-  path="/add-new" 
-  element={
-    <ProtectedRoute>
-      <AddShloka />
-    </ProtectedRoute>
-  } 
-/>
+        
+        {/* Protected Route for Edit List */}
+        <Route 
+          path="/edit-list" 
+          element={
+            <ProtectedRoute>
+              <EditList />
+            </ProtectedRoute>
+          } 
+        />
+        
+        {/* Protected Route for Edit Shloka */}
+        <Route 
+          path="/edit-shloka/:entryId/:shlokaIndex" 
+          element={
+            <ProtectedRoute>
+              <EditShloka />
+            </ProtectedRoute>
+          } 
+        />
+        
+        {/* Protected Route for Add New */}
+        <Route 
+          path="/add-new" 
+          element={
+            <ProtectedRoute>
+              <AddShloka />
+            </ProtectedRoute>
+          } 
+        />
       </Routes>
-     
     </Router>
   );
 }
