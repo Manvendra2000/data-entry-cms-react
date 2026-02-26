@@ -135,7 +135,7 @@ const AddShloka = () => {
   };
 
   // --- LOGIC HANDLERS ---
-  const handleHierarchyChange = (delta) => {
+const handleHierarchyChange = (delta) => {
     const newCount = bookConfig.hierarchyLevels + delta;
     if (newCount < 2 || newCount > 4) return; 
 
@@ -143,14 +143,27 @@ const AddShloka = () => {
     const newValues = [...entryData.hierarchyValues];
     
     if (delta > 0) {
-      newNames.push(`Level ${newCount}`);
+      // Targeted Fix: Assign specific Sanskrit names based on the level count
+      if (newCount === 3) {
+        newNames.push('प्रकरण');
+      } else if (newCount === 4) {
+        newNames.push('पद');
+      }
       newValues.push('');
     } else {
       newNames.pop();
       newValues.pop();
     }
-    setBookConfig(prev => ({ ...prev, hierarchyLevels: newCount, hierarchyNames: newNames }));
-    setEntryData(prev => ({ ...prev, hierarchyValues: newValues }));
+
+    setBookConfig(prev => ({ 
+      ...prev, 
+      hierarchyLevels: newCount, 
+      hierarchyNames: newNames 
+    }));
+    setEntryData(prev => ({ 
+      ...prev, 
+      hierarchyValues: newValues 
+    }));
   };
 
   const handleNext = () => {
